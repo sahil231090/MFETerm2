@@ -352,5 +352,31 @@ def ForwardSemiCouponParYeildCurveFromDiscountCurve_N(Z, N):
     return _y
 
 
+"""
+Spot Rate Curve Functions
+"""
 
+def SvenssonSpotCurve(beta_0, beta_1, beta_2, beta_3, tau_1, tau_2):
+    def _r(T):
+        _T1 = T/tau_1
+        _T2 = T/tau_2
+        return beta_0 + beta_1*np.exp(-_T1) + beta_2*np.exp(-_T1)*_T1 + beta_3*np.exp(-_T2)*_T2
+    return _r
+
+def NelsonSiegelFiveSpotCurve(beta_0, beta_1, beta_2, tau_1, tau_2):
+    def _r(T):
+        _T1 = T/tau_1
+        _T2 = T/tau_2
+        _e1 = np.exp(-_T1)
+        _e2 = np.exp(-_T2)
+        return beta_0 + beta_1*(1-_e1)/_T1 + beta_2*((1-_e2)/_T2 - _e2)
+    return _r
+    
+
+def NelsonSiegelSpotCurve(beta_0, beta_1, beta_2, tau_1):
+    def _r(T):
+        _T1 = T/tau_1
+        _e1 = np.exp(-_T1)
+        return beta_0 + beta_1*(1-_e1)/_T1 + beta_2*((1-_e1)/_T1 - _e1)
+    return _r
 
