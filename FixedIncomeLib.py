@@ -1,11 +1,8 @@
-"""
-Imports
-"""
-import numpy as np
 from __future__ import division
 from scipy.integrate import quad
 from scipy.misc import derivative
 from scipy.optimize import newton, minimize
+import numpy as np
 
 """
 Util Functions
@@ -20,8 +17,10 @@ a: the accumulator, who is also the 'zero' on the first call
 def fold(f, l, a):
     return a if(len(l) == 0) else fold(f, l[1:], f(a, l[0]))
 
-
-
+"""
+A curve with a simple constant value
+"""
+ConstCurveFromConst = lambda val: lambda t: val
 
 """
 Step functions: Use these functions to convert
@@ -82,6 +81,25 @@ def UnitLocalStepCurveFromArray(arr):
         idx = temp.index(min(temp))
         return arr[idx][1]
     return _c
+
+"""
+Use Local Linear Interpolation to get curve objects
+in between those that are specified in the array
+
+array input should be of type: [(T,val), ..]
+"""
+def UnitLocalLinearCurveFromArray(arr):
+    arr = sorted(arr, key=lambda x:x[0])
+    def _c(t):
+        l = [(idx, a[0], a[1]) for idx,a in enumerate(arr) if a[0]>t]
+        if len(l) == 0:
+            return arr[-1][1]
+        else:
+            j, tj, vj = l[0]
+            ti, vi = arr[j-1] 
+            return vi*(tj-t)/(tj-ti) + vj*(t-ti)/(tj-ti)
+    return _c
+
 
 """
 Curve Conversion Functions
@@ -199,7 +217,7 @@ Output:
 132.498349135
 """
 FVFromSpotCurve = lambda r: lambda t, PV=1: PV / DiscountCurveFromSpotCurve(r)(t)
-FVFromSpotCurve_k = lambda r, k: lambda t, PV=1: PV / DiscountCurveFromSpotCurve(r, k)(t)
+FVFromSpotCurve_k = lambda r, k: lambda t, PV=1: PV / DiscountCurveFromSpotCurve_k(r, k)(t)
 
 
 """
@@ -288,12 +306,14 @@ print BondParametersToCashFlows(par, maturity, coupon_rate, frequency)
 Output:
     [(0.5, 1.5), (1.0, 1.5), (1.5, 1.5), (2, 101.49999999999999)]
 """
-def BondParametersToCashFlows(par, maturity, coupon_rate, frequency, time=0):
-    cash_flow_array = [ (i/frequency, par*coupon_rate/frequency) for i in range(1,maturity*frequency) ]
-    cash_flow_array.append((maturity, par*(1+coupon_rate/frequency)))
-    if time>0:
-        cash_flow_array = [(cf[0]-time,cf[1]) for cf in cash_flow_array if cf[0]>time]
+def BondParametersToCashFlows(par, maturity, coupon_rate, frequency):
+    time = maturity - (1/frequency)
+    cash_flow_array = [(maturity, par*(1+coupon_rate/frequency))]
+    while time > 0:
+        cash_flow_array.insert(0, (time, par*coupon_rate/frequency))
+        time -= 1/frequency
     return cash_flow_array
+
 
 """
 Get the Yeild of a Bond given the Bond parameters and the price
@@ -344,7 +364,7 @@ def ForwardSemiCouponParYeildCurveFromDiscountCurve_N(Z, N):
             return 0
         else:
             denom = 0
-            numer = 2*(1-Z(T))
+            numer = 2*(Z(N)-Z(T))
             while((T-N)>0):
                 denom += Z(T)
                 T -= 0.5
