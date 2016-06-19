@@ -442,3 +442,21 @@ def MacaulayDurationFromDiscountCurve(cfs, Z):
     PV = PVFromDiscountCurve(Z)
     numer = fold( lambda tot, cf: tot+cf[0]*PV(cf[0], cf[1]), cfs, 0)
     return numer/P
+
+def ModifiedDurationFromSpotCurve_k(cfs, r, k):
+    Z = DiscountCurveFromSpotCurve_k(r, k)
+    P = NPVFromDiscountCurve(cfs, Z)
+    y = IRRFromPrice(cfs, P)
+    Dmac = MacalayDurationFromDiscountCurve(cfs, Z)
+    return Dmac/(1+y/k)
+
+def DollarDurationFromSpotCurve_k(cfs, r, k):
+    Z = DiscountCurveFromSpotCurve_k(r, k)
+    P = NPVFromDiscountCurve(cfs, Z)
+    Dmod = ModifiedDurationFromSpotCurve_k(cfs, r, k)
+    return Dmod * P / 100
+
+def DV01FromSpotCurve_k(cfs, r, k):
+    return DollarDurationFromSpotCurve_k(cfs, r, k)/100
+
+
