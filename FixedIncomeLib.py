@@ -277,7 +277,7 @@ Output:
     0.030225
 
 """
-IRRFromPrice = lambda cashflows, price: newton(lambda yeild: NPVFromYield(cashflows, yeild) - price, 0) 
+IRRFromPrice = lambda cashflows, price: newton(lambda yeild: NPVFromYield(cashflows, yeild) - price, 0, tol=1.48e-12, maxiter=500) 
 
 
 """
@@ -360,7 +360,7 @@ def SemiCouponParYeildCurveFromDiscountCurve(Z):
             cfs = BondParametersToCashFlows(par, mat, c, freq, True)
             npv = NPVFromDiscountCurve(cfs, Z)
             return np.power(npv - par, 2)
-        return newton(_f, 0)
+        return newton(_f, 0,  tol=1.48e-12, maxiter=500)
     return _y
 
 def SemiCouponParYeildCurveFromSpotCurve(r):
@@ -394,7 +394,7 @@ def ForwardSemiCouponParYeildCurveFromDiscountCurve_N(Z, N):
                 cfs_adj = [(a0-N, a1) for a0, a1 in cfs if a0 > N]
                 npv = NPVFromDiscountCurve(cfs_adj, Z)
                 return np.power(npv - par, 2)
-            return newton(_f, 0)
+            return newton(_f, 0, tol=1.48e-12, maxiter=500)
     return _y
 
 
@@ -447,7 +447,7 @@ def ModifiedDurationFromSpotCurve_k(cfs, r, k):
     Z = DiscountCurveFromSpotCurve_k(r, k)
     P = NPVFromDiscountCurve(cfs, Z)
     y = IRRFromPrice(cfs, P)
-    Dmac = MacalayDurationFromDiscountCurve(cfs, Z)
+    Dmac = MacaulayDurationFromDiscountCurve(cfs, Z)
     return Dmac/(1+y/k)
 
 def DollarDurationFromSpotCurve_k(cfs, r, k):
@@ -459,4 +459,11 @@ def DollarDurationFromSpotCurve_k(cfs, r, k):
 def DV01FromSpotCurve_k(cfs, r, k):
     return DollarDurationFromSpotCurve_k(cfs, r, k)/100
 
+def ConvexityFromSpotCurve_k(cfs, r, k):
+    Z = DiscountCurveFromSpotCurve_k(r, k)
+    P = NPVFromDiscountCurve(cfs, Z)
+    PV = PVFromDiscountCurve(Z)
+    y = IRRFromPrice(cfs, P)
+    numer = fold( lambda tot, cf: tot+cf[0]*(cf[0]+1)*PV(cf[0], cf[1])/(k*k), cfs, 0)
+    return numer/(P*np.power(1+y/k, k))
 
