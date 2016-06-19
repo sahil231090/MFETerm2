@@ -306,12 +306,16 @@ print BondParametersToCashFlows(par, maturity, coupon_rate, frequency)
 Output:
     [(0.5, 1.5), (1.0, 1.5), (1.5, 1.5), (2, 101.49999999999999)]
 """
-def BondParametersToCashFlows(par, maturity, coupon_rate, frequency):
+def BondParametersToCashFlows(par, maturity, coupon_rate, frequency, new_issue=False):
     time = maturity - (1/frequency)
     cash_flow_array = [(maturity, par*(1+coupon_rate/frequency))]
     while time > 0:
         cash_flow_array.insert(0, (time, par*coupon_rate/frequency))
         time -= 1/frequency
+    if new_issue:
+	t1, cf1 = cash_flow_array[0]
+	cf1 = par*(np.power(1+coupon_rate/frequency, frequency*t1)-1+np.isclose(t1,maturity))
+	cash_flow_array[0] = (t1,cf1)
     return cash_flow_array
 
 
@@ -338,7 +342,7 @@ Par Yeild Functions
 """
 """
 Get the Par Yeild Curve for Semi Coupons Bonds
-"""
+
 def SemiCouponParYeildCurveFromDiscountCurve(Z):
     def _y(T):
         denom = 0
@@ -348,7 +352,16 @@ def SemiCouponParYeildCurveFromDiscountCurve(Z):
             T -= 0.5
         return numer / denom
     return _y
-
+"""
+def SemiCouponParYeildCurveFromDiscountCurve(Z):
+    def _y(T):
+        par, freq, mat = 1, 2, T
+        def _f(c):
+            cfs = BondParametersToCashFlows(par, mat, c, freq, True)
+            npv = NPVFromDiscountCurve(cfs, Z)
+            return np.power(npv - par, 2)
+        return newton(_f, 0)
+    return _y
 
 def SemiCouponParYeildCurveFromSpotCurve(r):
     Z = DiscountCurveFromSpotCurve(r)
@@ -358,30 +371,49 @@ def SemiCouponParYeildCurveFromSpotCurve_k(r, k):
     Z = DiscountCurveFromSpotCurve_k(r, k)
     return SemiCouponParYeildCurveFromDiscountCurve(Z)
 
+#def ForwardSemiCouponParYeildCurveFromDiscountCurve_N(Z, N):
+#    def _y(T):
+#        if (T<N):
+#            return 0
+#        else:
+#            denom = 0
+#            numer = 2*(Z(N)-Z(T))
+#            while((T-N)>0):
+#                denom += Z(T)
+#                T -= 0.5
+#            return numer / denom
+#    return _y
 def ForwardSemiCouponParYeildCurveFromDiscountCurve_N(Z, N):
     def _y(T):
         if (T<N):
             return 0
         else:
-            denom = 0
-            numer = 2*(Z(N)-Z(T))
-            while((T-N)>0):
-                denom += Z(T)
-                T -= 0.5
-            return numer / denom
+            par, freq, mat = 1, 2, T
+            def _f(c):
+                cfs = BondParametersToCashFlows(par, mat, c, freq, True)
+                cfs_adj = [(a0-N, a1) for a0, a1 in cfs if a0 > N]
+                npv = NPVFromDiscountCurve(cfs_adj, Z)
+                return np.power(npv - par, 2)
+            return newton(_f, 0)
     return _y
+
+
 
 
 """
 Spot Rate Curve Functions
 """
 
+
 def SvenssonSpotCurve(beta_0, beta_1, beta_2, beta_3, tau_1, tau_2):
     def _r(T):
         _T1 = T/tau_1
         _T2 = T/tau_2
-        return beta_0 + beta_1*np.exp(-_T1) + beta_2*np.exp(-_T1)*_T1 + beta_3*np.exp(-_T2)*_T2
+        _e1 = np.exp(-_T1)
+        _e2 = np.exp(-_T2)
+        return beta_0 + beta_1*(1-_e1)/_T1 + beta_2*((1-_e1)/_T1 - _e1) + beta_3*((1-_e2)/_T2 - _e2)
     return _r
+
 
 def NelsonSiegelFiveSpotCurve(beta_0, beta_1, beta_2, tau_1, tau_2):
     def _r(T):
@@ -400,3 +432,13 @@ def NelsonSiegelSpotCurve(beta_0, beta_1, beta_2, tau_1):
         return beta_0 + beta_1*(1-_e1)/_T1 + beta_2*((1-_e1)/_T1 - _e1)
     return _r
 
+
+"""
+Duration and Convexity Functions
+"""
+
+def MacaulayDurationFromDiscountCurve(cfs, Z):
+    P = NPVFromDiscountCurve(cfs, Z)
+    PV = PVFromDiscountCurve(Z)
+    numer = fold( lambda tot, cf: tot+cf[0]*PV(cf[0], cf[1]), cfs, 0)
+    return numer/P
