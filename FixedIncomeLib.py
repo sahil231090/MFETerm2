@@ -3,6 +3,8 @@ from scipy.integrate import quad
 from scipy.misc import derivative
 from scipy.optimize import newton, minimize
 import numpy as np
+import random
+
 
 """
 Util Functions
@@ -277,7 +279,7 @@ Output:
     0.030225
 
 """
-IRRFromPrice = lambda cashflows, price: newton(lambda yeild: NPVFromYield(cashflows, yeild) - price, 0, tol=1.48e-12, maxiter=500) 
+IRRFromPrice = lambda cashflows, price: newton(lambda yeild: NPVFromYield(cashflows, yeild) - price, 0, tol=1.48e-12, maxiter=50000) 
 
 
 """
@@ -342,8 +344,8 @@ Par Yeild Functions
 """
 """
 Get the Par Yeild Curve for Semi Coupons Bonds
-
-def SemiCouponParYeildCurveFromDiscountCurve(Z):
+"""
+def SemiCouponParYeildCurveFromDiscountCurve_old(Z):
     def _y(T):
         denom = 0
         numer = 2*(1-Z(T))
@@ -352,7 +354,8 @@ def SemiCouponParYeildCurveFromDiscountCurve(Z):
             T -= 0.5
         return numer / denom
     return _y
-"""
+
+
 def SemiCouponParYeildCurveFromDiscountCurve(Z):
     def _y(T):
         par, freq, mat = 1, 2, T
@@ -360,7 +363,7 @@ def SemiCouponParYeildCurveFromDiscountCurve(Z):
             cfs = BondParametersToCashFlows(par, mat, c, freq, True)
             npv = NPVFromDiscountCurve(cfs, Z)
             return np.power(npv - par, 2)
-        return newton(_f, 0,  tol=1.48e-12, maxiter=500)
+        return newton(_f, 0,  tol=1.48e-12, maxiter=50000)
     return _y
 
 def SemiCouponParYeildCurveFromSpotCurve(r):
@@ -394,7 +397,7 @@ def ForwardSemiCouponParYeildCurveFromDiscountCurve_N(Z, N):
                 cfs_adj = [(a0-N, a1) for a0, a1 in cfs if a0 > N]
                 npv = NPVFromDiscountCurve(cfs_adj, Z)
                 return np.power(npv - par, 2)
-            return newton(_f, 0, tol=1.48e-12, maxiter=500)
+            return newton(_f, 0, tol=1.48e-12, maxiter=50000)
     return _y
 
 
@@ -439,9 +442,22 @@ Duration and Convexity Functions
 
 def MacaulayDurationFromDiscountCurve(cfs, Z):
     P = NPVFromDiscountCurve(cfs, Z)
-    PV = PVFromDiscountCurve(Z)
+    p = SemiCouponParYeildCurveFromDiscountCurve(Z)
+    T = max([cf[0] for cf in cfs])
+    y = ConstCurveFromConst(p(T))
+    Z2 = DiscountCurveFromSpotCurve_k(y, 2)
+    PV = PVFromDiscountCurve(Z2)
     numer = fold( lambda tot, cf: tot+cf[0]*PV(cf[0], cf[1]), cfs, 0)
     return numer/P
+
+def MacaulayDurationFromParCurve(cfs, p):
+    T = max([cf[0] for cf in cfs])
+    y = p(T)
+    Z2 = DiscountCurveFromSpotCurve_k(y, 2)
+    PV = PVFromDiscountCurve(Z2)
+    numer = fold( lambda tot, cf: tot+cf[0]*PV(cf[0], cf[1]), cfs, 0)
+    return numer/P
+
 
 def ModifiedDurationFromSpotCurve_k(cfs, r, k):
     Z = DiscountCurveFromSpotCurve_k(r, k)
@@ -463,7 +479,35 @@ def ConvexityFromSpotCurve_k(cfs, r, k):
     Z = DiscountCurveFromSpotCurve_k(r, k)
     P = NPVFromDiscountCurve(cfs, Z)
     PV = PVFromDiscountCurve(Z)
-    y = IRRFromPrice(cfs, P)
-    numer = fold( lambda tot, cf: tot+cf[0]*(cf[0]+1)*PV(cf[0], cf[1])/(k*k), cfs, 0)
-    return numer/(P*np.power(1+y/k, k))
+    p = SemiCouponParYeildCurveFromDiscountCurve(Z)
+    T = max([cf[0] for cf in cfs])
+    y = ConstCurveFromConst(p(T))
+    Z2 = DiscountCurveFromSpotCurve_k(y, 2)
+    PV = PVFromDiscountCurve(Z2)
+    numer = fold( lambda tot, cf: tot+cf[0]*(cf[0]+1/k)*PV(cf[0], cf[1]), cfs, 0)
+    return numer/(P*np.power(1+y(T)/k, k))
 
+
+"""
+Stochastic Module
+"""
+def BrownianPoint(t, seed=np.random.randint(0, np.iinfo(np.int32).max)):
+    np.random.seed(seed)
+    return normalvariate(0, np.power(t,0.5))
+
+def BrownianPath(T, steps=1000, seed=np.random.randint(0, np.iinfo(np.int32).max)):
+    np.random.seed(seed)
+    dt = T/steps
+    dW = np.random.normal(0.0, np.power(dt, 0.5))
+    return dW
+
+def BrownianMotion(T, steps=1000, seed=np.random.randint(0, np.iinfo(np.int32).max)):
+    dW = BrownianPath(T, steps, seed)
+    W = np.append([0], dW)
+    _W = UnitLocalLinearCurveFromArray(W)
+    return _W
+
+"""
+def GenralBrownianMotion(T, mu = lambda t, Wt = 0,sigma = lambda t, Wt = 1,B0 = 1, steps=1000, seed=np.random.randint(0)):
+    return 1
+"""
