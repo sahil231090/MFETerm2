@@ -439,10 +439,24 @@ def NelsonSiegelSpotCurve(beta_0, beta_1, beta_2, tau_1):
 """
 Duration and Convexity Functions
 """
-
+"""
 def MacaulayDurationFromDiscountCurve(cfs, Z):
     p = NPVFromDiscountCurve(cfs, Z)
     y = IRRFromPrice(cfs, p)
+    y = 2*(np.power(1+y,1/2)-1)
+    y = ConstCurveFromConst(y)
+    Z2 = DiscountCurveFromSpotCurve_k(y, 2)
+    PV = PVFromDiscountCurve(Z2)
+    P = NPVFromDiscountCurve(cfs, Z2)
+    numer = fold( lambda tot, cf: tot+cf[0]*PV(cf[0], cf[1]), cfs, 0)
+    return numer/P
+"""
+
+def MacaulayDurationFromSpotCurve_k(cfs, r, k):
+    Z = DiscountCurveFromSpotCurve_k(r, k)
+    p = NPVFromDiscountCurve(cfs, Z)
+    y = IRRFromPrice(cfs, p)
+    y = 2*(np.power(1+y,1/2)-1)
     y = ConstCurveFromConst(y)
     Z2 = DiscountCurveFromSpotCurve_k(y, 2)
     PV = PVFromDiscountCurve(Z2)
@@ -450,12 +464,13 @@ def MacaulayDurationFromDiscountCurve(cfs, Z):
     numer = fold( lambda tot, cf: tot+cf[0]*PV(cf[0], cf[1]), cfs, 0)
     return numer/P
 
+
 def ModifiedDurationFromSpotCurve_k(cfs, r, k):
     Z = DiscountCurveFromSpotCurve_k(r, k)
     p = NPVFromDiscountCurve(cfs, Z)
     y = IRRFromPrice(cfs, p)
     y = k*(np.power(1+y,1/k)-1)
-    Dmac = MacaulayDurationFromDiscountCurve(cfs, Z)
+    Dmac = MacaulayDurationFromSpotCurve_k(cfs, r, k)
     return Dmac/(1+y/k)
 
 def DollarDurationFromSpotCurve_k(cfs, r, k):

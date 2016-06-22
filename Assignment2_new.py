@@ -1,11 +1,9 @@
-
 from FixedIncomeLib import *
 from __future__ import division
 from IPython.display import Latex
 import os 
 import pandas as pd
 import matplotlib.pyplot as plt
-
 
 # Construst the Discount and Spot Yield Cruve
 
@@ -49,7 +47,7 @@ for t in range(1,n+1):
     mat = t
     
     cfs = BondParametersToCashFlows(par, mat, coupon, freq, True)
-    Dmac = MacaulayDurationFromDiscountCurve(cfs, Z)
+    Dmac = MacaulayDurationFromSpotCurve_k(cfs, r, 2)
     Dmod = ModifiedDurationFromSpotCurve_k(cfs, r, 2)
     NPV = NPVFromDiscountCurve(cfs, Z)
     DV = DV01FromSpotCurve_k(cfs, r, 2)
@@ -67,14 +65,22 @@ for t in range(1,n+1):
     mat = t
     
     
-    cfs_2 = BondParametersToCashFlows(par, mat, coupon_2, freq, True)    
+    cfs_2 = BondParametersToCashFlows(par, mat, coupon_2, freq, True)
+    
     cfs_12 = BondParametersToCashFlows(par, mat, coupon_12, freq, True)
     
-    Dmac_2 = MacaulayDurationFromDiscountCurve(cfs_2, Z)
-    Dmac_12 = MacaulayDurationFromDiscountCurve(cfs_12, Z)
+    npv = NPVFromDiscountCurve(cfs_2, Z)
+    ytm = IRRFromPrice(cfs_2, npv)
+    ytm2 = 2*(np.power(1+ytm,0.5)-1)
     
-    print (t, Dmac_2, Dmac_12)
-
+    npv = NPVFromDiscountCurve(cfs_12, Z)
+    ytm = IRRFromPrice(cfs_12, npv)
+    ytm12 = 2*(np.power(1+ytm,0.5)-1)
+    
+    Dmac_2 = MacaulayDurationFromSpotCurve_k(cfs_2, r, 2)
+    Dmac_12 = MacaulayDurationFromSpotCurve_k(cfs_12, r, 2)
+    
+    print (t, Dmac_2, Dmac_12, ytm2, ytm12)
 
 # Q3
 t_1 = 5
@@ -119,7 +125,6 @@ D4 = DV01FromSpotCurve_k(cf4, r, 2)
 print ("Durations:\n 5Y Bond: {0:.4f} \n 10Y Bond: {1:.4f} \n 15Y Bond: {2:.4f} \n ".format(D1, D2, D3))
 print ("We need to short {0:.4f} 5-year bonds in order to hedge a 10 year bond".format(D2*P2/(D1*P1)))
 print ("We need to short {0:.4f} 15-year bonds in order to hedge a 10 year bond".format(D2*P3/(D3*P1)))
-
 
 # Q4
 x = ( D2 - D3 ) / ( D1 - D3 )
@@ -176,9 +181,9 @@ DM1 = ModifiedDurationFromSpotCurve_k(cf1, r, 2)
 DM2 = ModifiedDurationFromSpotCurve_k(cf2, r, 2)
 DM3 = ModifiedDurationFromSpotCurve_k(cf3, r, 2)
 
-Dmac1 = MacaulayDurationFromDiscountCurve(cf1, Z)
-Dmac2 = MacaulayDurationFromDiscountCurve(cf2, Z)
-Dmac3 = MacaulayDurationFromDiscountCurve(cf3, Z)
+Dmac1 = MacaulayDurationFromSpotCurve_k(cf1, r, 2)
+Dmac2 = MacaulayDurationFromSpotCurve_k(cf2, r, 2)
+Dmac3 = MacaulayDurationFromSpotCurve_k(cf3, r, 2)
 
 
 C1 = ConvexityFromSpotCurve_k(cf1, r, 2)
