@@ -52,7 +52,8 @@ for t in range(1,n+1):
     NPV = NPVFromDiscountCurve(cfs, Z)
     DV = DV01FromSpotCurve_k(cfs, r, 2)
     Convex = ConvexityFromSpotCurve_k(cfs, r, 2)
-    print (t, coupon, Dmac, Dmod, DV, Convex)
+    
+    print """\\multicolumn{{1}}{{|l|}}{{{0}}}               & {1}                & {2}                & {3}    & {4}        \\\\ \\hline""".format(t, Dmac, Dmod, DV, Convex)
 
 
 # Q2
@@ -80,7 +81,9 @@ for t in range(1,n+1):
     Dmac_2 = MacaulayDurationFromSpotCurve_k(cfs_2, r, 2)
     Dmac_12 = MacaulayDurationFromSpotCurve_k(cfs_12, r, 2)
     
-    print (t, Dmac_2, Dmac_12, ytm2, ytm12)
+    print """{0}                 & {1}                      & {2}                       \\\\ \\hline""".format(t, Dmac_2, Dmac_12, ytm2, ytm12)
+    
+
 
 # Q3
 t_1 = 5
@@ -125,6 +128,7 @@ D4 = DV01FromSpotCurve_k(cf4, r, 2)
 print ("Durations:\n 5Y Bond: {0:.4f} \n 10Y Bond: {1:.4f} \n 15Y Bond: {2:.4f} \n ".format(D1, D2, D3))
 print ("We need to short {0:.4f} 5-year bonds in order to hedge a 10 year bond".format(D2*P2/(D1*P1)))
 print ("We need to short {0:.4f} 15-year bonds in order to hedge a 10 year bond".format(D2*P3/(D3*P1)))
+
 
 # Q4
 x = ( D2 - D3 ) / ( D1 - D3 )
@@ -196,7 +200,6 @@ vector_eq = np.matrix([ P2, D2 ]).reshape((2,1))
 print("Number of units")
 print(50000*(Matrix_eq.I * vector_eq))
 
-
 # Q8
 
 r_p10 = lambda t: r(t) + 0.001
@@ -233,10 +236,16 @@ for t in range(1,n+1):
     Do_p300 = Price - Price * Dmod * 0.03
     Do_n300 = Price + Price * Dmod * 0.03
     
-    DC_p10 = Price - Price * Dmod * 0.001 + 0.5 * Conv * 0.001 * 0.001
-    DC_n10 = Price + Price * Dmod * 0.001 + 0.5 * Conv * 0.001 * 0.001
-    DC_p300 = Price - Price * Dmod * 0.03 + 0.5 * Conv * 0.03 * 0.03
-    DC_n300 = Price + Price * Dmod * 0.03 + 0.5 * Conv * 0.03 * 0.03
+    DC_p10 = Price - Price * Dmod * 0.001 + 0.5 * Price * Conv * 0.001 * 0.001
+    DC_n10 = Price + Price * Dmod * 0.001 + 0.5 * Price * Conv * 0.001 * 0.001
+    DC_p300 = Price - Price * Dmod * 0.03 + 0.5 * Price * Conv * 0.03 * 0.03
+    DC_n300 = Price + Price * Dmod * 0.03 + 0.5 * Price * Conv * 0.03 * 0.03
     
-    print Price_p10, Do_p10, DC_p10
-
+    # Duration
+    #print """{0}                 & {1}       & {2}         & {3}        & {4}          \\\\ \\hline""".format(t, Do_p10, Do_n10, Do_p300, Do_n300)
+    # Duration + Convex
+    #print """{0}                 & {1}       & {2}         & {3}        & {4}          \\\\ \\hline""".format(t, DC_p10, DC_n10, DC_p300, DC_n300)
+    # Spot Rate jump
+    #print """{0}                 & {1}       & {2}         & {3}        & {4}          \\\\ \\hline""".format(t, Price_p10, Price_n10, Price_p300, Price_n300)
+    
+    
