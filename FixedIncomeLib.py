@@ -441,28 +441,20 @@ Duration and Convexity Functions
 """
 
 def MacaulayDurationFromDiscountCurve(cfs, Z):
-    P = NPVFromDiscountCurve(cfs, Z)
-    p = SemiCouponParYeildCurveFromDiscountCurve(Z)
-    T = max([cf[0] for cf in cfs])
-    y = ConstCurveFromConst(p(T))
+    p = NPVFromDiscountCurve(cfs, Z)
+    y = IRRFromPrice(cfs, p)
+    y = ConstCurveFromConst(y)
     Z2 = DiscountCurveFromSpotCurve_k(y, 2)
     PV = PVFromDiscountCurve(Z2)
+    P = NPVFromDiscountCurve(cfs, Z2)
     numer = fold( lambda tot, cf: tot+cf[0]*PV(cf[0], cf[1]), cfs, 0)
     return numer/P
-
-def MacaulayDurationFromParCurve(cfs, p):
-    T = max([cf[0] for cf in cfs])
-    y = p(T)
-    Z2 = DiscountCurveFromSpotCurve_k(y, 2)
-    PV = PVFromDiscountCurve(Z2)
-    numer = fold( lambda tot, cf: tot+cf[0]*PV(cf[0], cf[1]), cfs, 0)
-    return numer/P
-
 
 def ModifiedDurationFromSpotCurve_k(cfs, r, k):
     Z = DiscountCurveFromSpotCurve_k(r, k)
-    P = NPVFromDiscountCurve(cfs, Z)
-    y = IRRFromPrice(cfs, P)
+    p = NPVFromDiscountCurve(cfs, Z)
+    y = IRRFromPrice(cfs, p)
+    y = k*(np.power(1+y,1/k)-1)
     Dmac = MacaulayDurationFromDiscountCurve(cfs, Z)
     return Dmac/(1+y/k)
 
@@ -478,14 +470,13 @@ def DV01FromSpotCurve_k(cfs, r, k):
 def ConvexityFromSpotCurve_k(cfs, r, k):
     Z = DiscountCurveFromSpotCurve_k(r, k)
     P = NPVFromDiscountCurve(cfs, Z)
-    PV = PVFromDiscountCurve(Z)
-    p = SemiCouponParYeildCurveFromDiscountCurve(Z)
-    T = max([cf[0] for cf in cfs])
-    y = ConstCurveFromConst(p(T))
-    Z2 = DiscountCurveFromSpotCurve_k(y, 2)
+    y = IRRFromPrice(cfs, P)
+    y = k*(np.power(1+y,1/k)-1)
+    y_ = ConstCurveFromConst(y)
+    Z2 = DiscountCurveFromSpotCurve_k(y_, 2)
     PV = PVFromDiscountCurve(Z2)
     numer = fold( lambda tot, cf: tot+cf[0]*(cf[0]+1/k)*PV(cf[0], cf[1]), cfs, 0)
-    return numer/(P*np.power(1+y(T)/k, k))
+    return numer/(P*np.power(1+y/k, k))
 
 
 """
