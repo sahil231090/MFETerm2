@@ -34,8 +34,6 @@ class linear_congruential_generator:
     def nxt(self):
         return next(self.sample())
 
-    
-class box_muller_generator:
 """
 b = box_muller_generator()
 for i in b.sample(20):
@@ -43,6 +41,7 @@ for i in b.sample(20):
 
 print b.nxt
 """
+class box_muller_generator:
     def __init__(self):
         self.cache = None
 
@@ -53,15 +52,19 @@ print b.nxt
         return np.random.uniform(size=size)
         
     def sample(self, size=1):
+        bit_shift = 0
         for i in xrange(size):
             if (i %2 == 1) and (self.cache is not None) and (i==0):
+                bit_shift = 1
                 yield self.cache
             else:
-                if (i %2 == 0):
+                if (i % 2 == bit_shift):
                     uni = self._n_uni_dist(2*(size/2) + 2)
                     u1, u2 = uni[i], uni[i+1]
                     r, theta = np.sqrt(-2*np.log(u1)), 2*np.pi*u2
                     z1, z2 = r*np.cos(theta), r*np.sin(theta)
+                    if i == (size-1):
+                        self.cache = z2
                     yield z1
                 else:
                     yield z2
@@ -70,8 +73,6 @@ print b.nxt
     def nxt(self):
         return next(self.sample())
                 
-
-class polar_rejection_method:
 """
 p = polar_rejection_method()
 for i in p.sample(20):
@@ -79,6 +80,7 @@ for i in p.sample(20):
 
 print p.nxt
 """
+class polar_rejection_method:
     def __init__(self):
         self.cache = None
 
@@ -86,11 +88,13 @@ print p.nxt
         np.random.seed(val)
     
     def sample(self, size=1):
+        bit_shift = 0
         for i in xrange(size):
             if (i %2 == 1) and (self.cache is not None) and (i==0):
+                bit_shift = 1
                 yield self.cache
             else:
-                if (i %2 == 0):
+                if (i %2 == bit_shift):
                     while True:
                         uni = np.random.uniform(-1, 1, size=2)
                         u1, u2 = uni[0], uni[1]
@@ -101,6 +105,8 @@ print p.nxt
                     sin = np.true_divide(u2, r)
                     r_ = np.sqrt(-4*np.log(r))
                     z1, z2 = r_*cos, r_*sin
+                    if i == (size-1):
+                        self.cache = z2
                     yield z1
                 else:
                     yield z2
@@ -108,4 +114,5 @@ print p.nxt
     @property
     def nxt(self):
         return next(self.sample())
- 
+    
+
