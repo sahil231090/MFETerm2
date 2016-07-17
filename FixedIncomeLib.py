@@ -1,10 +1,10 @@
 from __future__ import division
 from scipy.integrate import quad
 from scipy.misc import derivative
-from scipy.optimize import newton, minimize
+from scipy.optimize import newton, minimize, fmin
 import numpy as np
 import random
-
+from scipy.stats import norm
 
 """
 Util Functions
@@ -259,6 +259,9 @@ Get the NPV of an array of cashflows given a yeild
 """
 NPVFromYield = lambda cfs, y: fold(lambda p, cf: p+cf[1]/((1+y)**(cf[0])), cfs,0)
 
+NPVFromYield_k = lambda cfs, y, k: fold(lambda p, cf: p+cf[1]/((1+y/k)**(cf[0]*k)), cfs,0)
+
+
 """
 Get the IRR of an array of cashflows given a price
 Intput:
@@ -279,8 +282,9 @@ Output:
     0.030225
 
 """
-IRRFromPrice = lambda cashflows, price: newton(lambda yeild: NPVFromYield(cashflows, yeild) - price, 0, tol=1.48e-12, maxiter=50000) 
+IRRFromPrice = lambda cashflows, price: newton(lambda yeild: NPVFromYield(cashflows, yeild) - price, 0, tol=1e-10, maxiter=50000) 
 
+IRRFromPrice_k = lambda cashflows, price, k: newton(lambda yeild: NPVFromYield_k(cashflows, yeild, k) - price, 0, tol=1e-10, maxiter=50000)
 
 """
 Bond Functions
@@ -289,7 +293,7 @@ Bond Functions
 """
 Get an array of Cashflows from the bond paramters
 Input:
-    Par: The facev value of the Bond
+    Par: The face value of the Bond
     Maturity: The Maturity of Bond In Years
     Coupon Rate: Coupon Rate Sepcified
     Frequency: Number of times Bond Pays each year
@@ -497,23 +501,114 @@ def ConvexityFromSpotCurve_k(cfs, r, k):
 """
 Stochastic Module
 """
-def BrownianPoint(t, seed=np.random.randint(0, np.iinfo(np.int32).max)):
-    np.random.seed(seed)
-    return normalvariate(0, np.power(t,0.5))
+def rand_seed():
+    return np.random.randint(0, np.iinfo(np.int32).max)
 
-def BrownianPath(T, steps=1000, seed=np.random.randint(0, np.iinfo(np.int32).max)):
+def BrownianPoint(t, seed=rand_seed()):
+    np.random.seed(seed)
+    return np.normalvariate(0, np.power(t,0.5))
+
+def BrownianPath(T, steps=1000, seed=rand_seed()):
     np.random.seed(seed)
     dt = T/steps
-    dW = np.random.normal(0.0, np.power(dt, 0.5))
+    dW = np.random.normal(0.0, np.power(dt, 0.5), steps)
     return dW
 
-def BrownianMotion(T, steps=1000, seed=np.random.randint(0, np.iinfo(np.int32).max)):
+def BrownianMotion(T, steps=1000, seed=rand_seed()):
     dW = BrownianPath(T, steps, seed)
-    W = np.append([0], dW)
-    _W = UnitLocalLinearCurveFromArray(W)
+    W = np.cumsum(np.append([0], dW))
+    dt = T/steps
+    T = [i*dt for i in range(steps+1)]
+    _W = UnitLocalLinearCurveFromArray(zip(T,W))
     return _W
 
+def GenralBrownianMotion(T, mu= lambda t, Wt: 0,
+			sigma= lambda t, Wt: 1,
+			B0 = 1, steps=1000, 
+			seed=rand_seed()):
+    dW = BrownianPath(T, steps, seed)
+    W = np.zeors((steps+1,))
+    dt = T/steps
+    T = [i*dt for i in range(steps+1)]
+    for idx, dw in enumerate(dW):
+        t=T[idx]
+        w=W[idx]
+        _mu = mu(t,w)
+        _sigma = sigma(t,w)
+        W[idx+1] = _mu*dt + _simga*dw
+    _W = UnitLocalLinearCurveFromArray(zip(T,W))
+    return _W 
+
+
 """
-def GenralBrownianMotion(T, mu = lambda t, Wt = 0,sigma = lambda t, Wt = 1,B0 = 1, steps=1000, seed=np.random.randint(0)):
-    return 1
+Continous Time models
 """
+def DiscountCurveFromVasicek(mu, kappa, sigma):
+    B = lambda T : (1-np.exp(-kappa*T)/kappa)
+    A = lambda T : (B(T)-T)*(mu-((sigma**2)/(2*(kappa**2)))) - ((sigma*B(T))**2)/(4*kappa)
+    Z = lambda r, T: np.exp(A(T)-B(T)*r)
+    return Z
+
+def OptionPricerHelperFromVasicek(mu, kappa, sigma, TO, TB, r, par, K):
+    sig_z = np.sqrt((sigma**2)*(1-np.exp(-2*kappa*TO))*((1-np.exp(-kappa*(TB-TO)))**2)/(2*(kappa**3)))
+    Z = DiscountCurveFromVasicek(mu, kappa, sigma)
+    h = (np.log(par*Z(r, TB)/(K*Z(r, TO)))/sig_z) + (sig_z/2.0)
+    
+    F = par*Z(r, TB)
+    PV_K = K*Z(r, TO)
+    d1 = h
+    d2 = h - sig_z
+    return F, PV_K, d1, d2
+
+def EuroOptionPricerFromParameters(F, PV_K, d1, d2, o_type):
+    N_1 = norm.cdf(d1)
+    N_2 = norm.cdf(d2)
+    val = 0.0
+    if o_type=='Call':
+        val = F*N_1 - PV_K*N_2
+    elif o_type=='Put':
+        val = PV_K*(1-N_2) - F*(1-N_1)
+    return val
+
+def EuroOptionPricerFromVasicek(mu, kappa, sigma, TO, TB, r, par, K, o_type):
+    F, PV_K, d1, d2 = OptionPricerHelperFromVasicek(mu, kappa, sigma, TO, TB, r, par, K) 
+    return EuroOptionPricerFromParameters(F, PV_K, d1, d2, o_type)
+
+def EuroOptionPricerCouponBondFromVasicek(mu, kappa, sigma, TO, TB, r, par, 
+						K, c_rate, c_freq, o_type):
+    cf_array=BondParametersToCashFlows(par, TB, c_rate, c_freq)
+    cf_array=cf_array[int(c_freq*TO+0.5):]
+    n = len(cf_array)
+    k_array = np.zeros((n,))
+    Z = DiscountCurveFromVasicek(mu, kappa, sigma)
+    def opt_r(r_star):
+        _Z = lambda t: Z(r_star,t)
+        val = NPVFromDiscountCurve(cf_array, _Z)/_Z(TO)
+        return np.power(val-K,2)
+    r_star = fmin(opt_r, 0, disp=0)[0]
+    PV = PVFromDiscountCurve(lambda t: Z(r_star, t))
+    val = 0
+    for i in range(n):
+        k_array[i] = PV(cf_array[i][0], cf_array[i][1])/PV(TO) 
+        val += EuroOptionPricerFromVasicek(mu, kappa, sigma, 
+						cf_array[i][0], TB, r, 
+						cf_array[i][1], 
+						k_array[i], o_type)
+    return val
+
+def BinaryArrayFromUniformDist( u , l, qs=None):
+    if qs is None:
+        qs = 0.5 * np.ones((l, 1))
+    out = []
+    for i in xrange(l):
+        # Ensure that the probability
+        # is between 0 and 1
+        assert qs[i] <= 1
+        assert qs[i] >= 0
+
+        if u < qs[i]:
+            out.append(0)
+        else:
+            out.append(1)
+    return out
+
